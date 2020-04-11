@@ -1,0 +1,9 @@
+takeoverShit v0.1
+==================
+Changes:
+Fast as fuck!
+Optimized the HTTP request concurrency.
+Takes in a pool of requests concuurently.
+
+TODO: 
+Banner & formatting
