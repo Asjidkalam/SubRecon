@@ -1,5 +1,5 @@
 # SubRecon
-Fast Subdomain Takeover Enumeration tool written in Go. It uses Golang concurrency and hence is very fast. It can easily detect potential subdomain takeovers that exist. 
+Fast Subdomain Takeover Enumeration tool written in Go. It uses Golang concurrency and hence is very fast. It can easily detect potential subdomain takeovers that exist. Currently it only has 3 services, more services will be added soon..
 
 ## Installing
 
