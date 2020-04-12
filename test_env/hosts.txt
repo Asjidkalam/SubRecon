@@ -1,7 +1,0 @@
-www.google.com
-http://www.facebook.com
-www.microsoft.com
-http://www.bing.com
-www.msn.com
-http://www.gmail.com
-www.live.com
