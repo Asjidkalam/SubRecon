@@ -3,14 +3,17 @@ package main
 import (
 	"bufio"
 	"bytes"
+	"crypto/tls"
 	"flag"
 	"fmt"
 	"io"
 	"io/ioutil"
 	"log"
+	"net"
 	"net/http"
 	"os"
 	"strings"
+	"time"
 
 	"./utils"
 )
@@ -26,12 +29,27 @@ import (
 	...more services will be added soon.
 */
 var vulnHosts [3]string
-var client http.Client
+
+// security checks
+var tr = &http.Transport{
+	TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+	Dial: (&net.Dialer{
+		Timeout:   15 * time.Second,
+		KeepAlive: 15 * time.Second,
+	}).Dial,
+	TLSHandshakeTimeout: 10 * time.Second,
+}
+
+var client = &http.Client{
+	Transport: tr,
+	Timeout:   10 * time.Second,
+}
+
+//var wg sync.WaitGroup // handle sync
 
 /*
 	vulnHosts[ 0 => Amazon, 1 => GitHub Pages, 2 => Readme.io ]
 */
-
 func checkAws(done chan bool, resp string, url string, status int) {
 	if strings.Contains(resp, "NoSuchBucket") {
 		fmt.Println("\n[>] Found Potential AWS S3 Takeover On", url)
@@ -79,25 +97,33 @@ func lineCounter(r io.Reader, lineCounted chan int) {
 }
 
 // concurrent http requests
-func MakeRequests(url string, bodyResp chan<- string, statusResp chan<- int) {
+func MakeRequests(url string, bodyResp chan<- string, statusResp chan<- int) error {
+
 	resp, err := client.Get(url)
 	if err != nil {
-		// do nothing
+		fmt.Println("[!]", err)
+		return err
 	}
 	defer resp.Body.Close()
 
 	// body parsing
 	bodyBytes, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		// do nothing
+		fmt.Println("[!]", err)
 	}
 	bodyResp <- string(bodyBytes)
 	statusResp <- int(resp.StatusCode)
+
+	//wg.Done()
+	return nil
 }
 
 func main() {
 
 	utils.Banner()
+
+	// no verify
+	http.DefaultTransport.(*http.Transport).TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
 
 	hostFile := flag.String("i", "", ">> Hosts, input file")
 	outFile := flag.String("o", "", ">> Output file")
@@ -144,9 +170,10 @@ func main() {
 
 	scanner := bufio.NewScanner(file)
 
+	fmt.Println("[+] Please wait..")
+
 	// on each hosts..
 	for scanner.Scan() {
-		fmt.Printf("\n[*] (%d/%d) Hosts Completed", running, count)
 		url = scanner.Text()
 		if url != "" {
 			// url format handling
@@ -154,15 +181,28 @@ func main() {
 				url = "http://" + url
 			}
 			// recurent calling of gouroutines here!
+			//wg.Add(1)
 			go MakeRequests(url, bodyResp, statusResp)
 		}
-		running++
 	}
+
+	//wg.Wait()
+	// close(bodyResp)
+	// close(statusResp)
+
+	// output time.
+	outputFile, err := os.Create(*outFile)
+	if err != nil {
+		fmt.Println("[!] Error while creating output file", err)
+	}
+	defer outputFile.Close()
 
 	// check for return channels.
 	for i := 0; i < count; i++ {
 		bodyString := <-bodyResp
 		statusCode := <-statusResp
+
+		fmt.Printf("\n[*] (%d/%d) Hosts Completed", running, count)
 
 		// deploy goroutine for checking each services concurrently
 		go checkAws(done, bodyString, url, statusCode)
@@ -177,14 +217,7 @@ func main() {
 		// writing
 		for i := 0; i < len(vulnHosts); i++ {
 			if vulnHosts[i] != "" {
-
-				// output time.
-				outputFile, err := os.Create(*outFile)
-				if err != nil {
-					fmt.Println("[!] Error while creating output file", err)
-				}
-				defer outputFile.Close()
-
+				fmt.Println("Writing")
 				if i == 0 {
 					str := "[+] AWS: " + vulnHosts[i]
 					outputFile.WriteString(str)
@@ -204,6 +237,7 @@ func main() {
 		for i := 0; i < len(vulnHosts); i++ {
 			vulnHosts[i] = ""
 		}
+		running++
 	}
 
 	// we done.
