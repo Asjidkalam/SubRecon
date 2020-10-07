@@ -28,7 +28,7 @@ import (
 	- GitHub Pages
 	...more services will be added soon.
 */
-var vulnHosts [3]string
+var vulnHosts [4]string
 
 // security checks
 var tr = &http.Transport{
@@ -48,7 +48,7 @@ var client = &http.Client{
 //var wg sync.WaitGroup // handle sync
 
 /*
-	vulnHosts[ 0 => Amazon, 1 => GitHub Pages, 2 => Readme.io ]
+	vulnHosts[ 0 => Amazon, 1 => GitHub Pages, 2 => Readme.io, 3=> Bitbucket ]
 */
 func checkAws(done chan bool, resp string, url string, status int) {
 	if strings.Contains(resp, "NoSuchBucket") {
@@ -72,6 +72,15 @@ func checkReadmeio(done chan bool, resp string, url string, status int) {
 		fmt.Println("\n[>] Found Potential Readme.io Takeover On", url)
 		fmt.Println("[+] Status Code:", status)
 		vulnHosts[2] = url
+	}
+	done <- true
+}
+
+func checkBitbucket(done chan bool, resp string, url string, status int) {
+	if strings.Contains(resp, "Repository not found") {
+		fmt.Println("\n[>] Found Potential Bitbucket Takeover On", url)
+		fmt.Println("[+] Status Code:", status)
+		vulnHosts[3] = url
 	}
 	done <- true
 }
@@ -208,8 +217,10 @@ func main() {
 		go checkAws(done, bodyString, url, statusCode)
 		go checkGpages(done, bodyString, url, statusCode)
 		go checkReadmeio(done, bodyString, url, statusCode)
-
+		go checkBitbucket(done, bodyString, url, statusCode)
+		
 		// wait for goroutines to finish
+		<-done
 		<-done
 		<-done
 		<-done
@@ -228,6 +239,10 @@ func main() {
 				}
 				if i == 2 {
 					str := "[+] Readme.io: " + vulnHosts[i]
+					outputFile.WriteString(str)
+				}
+				if i == 3 {
+					str := "[+] Bitbucket: " + vulnHosts[i]
 					outputFile.WriteString(str)
 				}
 				fmt.Println("[*] Output written to", *outFile)
