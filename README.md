@@ -14,3 +14,9 @@ go get github.com/Asjidkalam/SubRecon
 ` ./SubRecon -i hosts.txt -o results.txt`
 - `-i` List of Subdomains
 - `-o` Output/Result file
+
+
+<br>
+<br>
+This tool is created during learning GoLang and hence the project is deprecated. 
+Thanks ✌️ 
